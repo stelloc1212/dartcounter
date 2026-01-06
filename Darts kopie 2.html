@@ -1,0 +1,1560 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dart 501 (Double-out) – Multi-player</title>
+  <style>
+    :root{
+      --bg:#0b0d10;
+      --card:#12161c;
+      --card2:#0f1318;
+      --text:#e9eef6;
+      --muted:#aab6c5;
+
+      --accent:#5ad3a5;
+      --danger:#ff5c7a;
+      --warn:#ffd166;
+      --border: rgba(255,255,255,.10);
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius:16px;
+      --btn:#1a2029;
+      --btn2:#202838;
+      --purple:#b48cff;
+
+      /* Dartboard (classic look) */
+      --db-red:#E3292E;
+      --db-green:#309F6A;
+      --db-black:#0b0d10;
+      --db-white:#f2f4f7;
+      --db-wire:#a9b3c2;
+
+      /* Neon */
+      --neon-hit:#5ad3a5;
+      --neon-reco:#ffe86b;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: radial-gradient(1200px 600px at 10% 0%, rgba(90,211,165,.12), transparent 60%),
+                  radial-gradient(1000px 700px at 90% 10%, rgba(180,140,255,.10), transparent 55%),
+                  var(--bg);
+      color:var(--text);
+      min-height:100vh;
+      padding:18px;
+    }
+    h1{font-size:18px; margin:0 0 10px 0; letter-spacing:.2px}
+
+    .wrap{
+      max-width:1180px; margin:0 auto;
+      display:grid; gap:14px;
+      grid-template-columns: 1.15fr .85fr;
+      align-items:start;
+    }
+    .panel{
+      background: linear-gradient(180deg, rgba(255,255,255,.03), transparent 35%), var(--card);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .panel header{
+      padding:14px 14px 10px;
+      border-bottom: 1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+    }
+    .panel header .sub{
+      color:var(--muted); font-size:12px; margin-top:2px;
+    }
+    .panel .content{ padding:14px; }
+    .row{display:flex; gap:10px; align-items:center}
+
+    button{
+      appearance:none; border:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,.05), transparent 40%), var(--btn);
+      color:var(--text); padding:10px 12px; border-radius:12px;
+      cursor:pointer; transition: transform .04s ease, border-color .1s ease, background .1s ease;
+      font-weight:600;
+    }
+    button:active{ transform: translateY(1px) }
+    button:disabled{ opacity:.45; cursor:not-allowed }
+    .btn-accent{
+      border-color: rgba(90,211,165,.35);
+      background: linear-gradient(180deg, rgba(90,211,165,.18), transparent 45%), var(--btn2);
+    }
+    .btn-danger{
+      border-color: rgba(255,92,122,.35);
+      background: linear-gradient(180deg, rgba(255,92,122,.16), transparent 45%), var(--btn2);
+    }
+    .btn-warn{
+      border-color: rgba(255,209,102,.35);
+      background: linear-gradient(180deg, rgba(255,209,102,.18), transparent 45%), var(--btn2);
+    }
+
+    .pill{
+      display:inline-flex; align-items:center; justify-content:center;
+      gap:8px;
+      padding:7px 10px; border-radius:999px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      color:var(--muted); font-size:12px;
+      white-space:nowrap;
+    }
+    .pill strong{color:var(--text)}
+    .pill.purple{
+      border-color: rgba(180,140,255,.55);
+      background: linear-gradient(180deg, rgba(180,140,255,.22), transparent 55%), rgba(255,255,255,.02);
+      color: var(--purple);
+    }
+
+    /* Setup */
+    .players-setup{ display:grid; gap:10px; }
+    .player-line{
+      display:grid; grid-template-columns: 1fr auto;
+      gap:10px; align-items:center;
+      padding:10px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      background: rgba(255,255,255,.02);
+    }
+    input[type="text"]{
+      width:100%;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background: rgba(0,0,0,.25);
+      color:var(--text);
+      outline:none;
+    }
+
+    /* Game list */
+    .players-game{ display:grid; gap:12px; }
+    .player-card{
+      border:1px solid var(--border);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,.03), transparent 45%), var(--card2);
+      padding:12px;
+    }
+    .player-card.active{
+      border-color: rgba(90,211,165,.55);
+      box-shadow: 0 0 0 3px rgba(90,211,165,.10);
+    }
+    .player-top{
+      display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+    }
+    .name{
+      font-weight:800; letter-spacing:.2px;
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    }
+    .score{ font-size:18px; font-weight:900; }
+    .meta{ margin-top:2px; color:var(--muted); font-size:12px; line-height:1.35; }
+
+    .throws{
+      margin-top:10px;
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:8px;
+    }
+    .throw-box{
+      padding:10px 10px;
+      border-radius: 14px;
+      border:1px dashed rgba(255,255,255,.14);
+      background: rgba(255,255,255,.02);
+      min-height:44px;
+      display:flex; align-items:center; justify-content:center;
+      font-weight:800;
+      user-select:none;
+      position:relative;
+    }
+    .throw-box.selected{
+      border-style: solid;
+      border-color: rgba(90,211,165,.65);
+      box-shadow: 0 0 0 3px rgba(90,211,165,.10);
+    }
+    .throw-box.locked{ opacity:.70; }
+
+    /* Recommended checkout boxes (now works for 1/2/3 darts) */
+    .throw-box.reco{
+      border-style:solid;
+      border-color: rgba(255,232,107,.9);
+      box-shadow:
+        0 0 0 3px rgba(255,232,107,.12),
+        0 0 18px rgba(255,232,107,.35);
+      background: linear-gradient(180deg, rgba(255,232,107,.12), rgba(255,232,107,.04));
+    }
+
+    .advice{
+      margin-top:10px;
+      color: var(--muted);
+      font-size:12px;
+      line-height:1.35;
+    }
+    .advice strong{color:var(--text)}
+    .advice .one{
+      margin-top:6px;
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      padding:7px 10px;
+      border-radius: 999px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+      font-weight:800;
+      white-space:nowrap;
+    }
+
+    .sep{ height:1px; background: var(--border); margin:12px 0; }
+    .small{ font-size:12px; color: var(--muted); }
+
+    /* RIGHT: board + keypad side-by-side */
+    .rightGrid{
+      display:grid;
+      grid-template-columns: 1fr 1.05fr; /* board | keypad */
+      gap:12px;
+      align-items:start;
+    }
+
+    .boardWrap{
+      border:1px solid var(--border);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,.03), transparent 45%), rgba(0,0,0,.18);
+      padding:12px;
+    }
+    .boardHead{
+      display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+      margin-bottom:10px;
+    }
+    .boardTitle{
+      font-weight:900;
+      letter-spacing:.2px;
+      font-size:13px;
+      color: var(--text);
+    }
+    .boardHint{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.25;
+    }
+    .boardStage{
+      width:100%;
+      aspect-ratio: 1 / 1;
+      display:grid;
+      place-items:center;
+      overflow:hidden;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.10);
+      background: radial-gradient(600px 400px at 50% 30%, rgba(90,211,165,.10), transparent 60%);
+    }
+    svg#dartboard{
+      width:100%;
+      height:100%;
+      display:block;
+    }
+
+    /* Keypad */
+    .multis{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:8px;
+      margin-bottom:10px;
+    }
+    .keypad{
+      display:grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap:8px;
+    }
+    .keypad button{ padding:10px 0; border-radius:14px; }
+    .multi.active{
+      border-color: rgba(90,211,165,.55);
+      background: linear-gradient(180deg, rgba(90,211,165,.18), transparent 45%), var(--btn2);
+    }
+    .actions{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:8px;
+      margin-top:10px;
+    }
+    .log{
+      margin-top:10px;
+      color: var(--muted);
+      font-size:12px;
+      line-height:1.4;
+      border-top:1px solid var(--border);
+      padding-top:10px;
+      max-height: 180px;
+      overflow:auto;
+    }
+
+    /* SVG highlight effects */
+    .seg{
+      stroke: rgba(255,255,255,.10);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+    }
+    .seg.hit{
+      stroke: var(--neon-hit);
+      stroke-width: 2;
+      filter: url(#glowHit);
+    }
+    .seg.reco{
+      stroke: var(--neon-reco);
+      stroke-width: 2;
+      filter: url(#glowReco);
+    }
+
+    /* Numbers */
+    .dbNum{
+      font-weight: 900;
+      font-size: 18px;
+      fill: rgba(255,255,255,.92);
+      text-anchor: middle;
+      dominant-baseline: middle;
+      paint-order: stroke;
+      stroke: rgba(0,0,0,.55);
+      stroke-width: 3px;
+    }
+
+    /* Dart marker */
+    .dartMarker{
+      filter: url(#dartShadow);
+      transform-origin: center;
+      animation: dartIn .16s ease-out;
+    }
+    @keyframes dartIn{
+      from{ transform: translateY(-16px) scale(.8); opacity:.0; }
+      to{ transform: translateY(0) scale(1); opacity:1; }
+    }
+
+    /* WINNER MODAL + CONFETTI */
+    .overlay{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.60);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:999;
+      padding:18px;
+    }
+    .overlay.show{ display:flex; }
+    .modal{
+      width:min(560px, 100%);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), transparent 40%), var(--card);
+      border:1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      position:relative;
+      overflow:hidden;
+    }
+    .modal header{
+      padding:16px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .modal .body{ padding:16px; }
+    .winnerTitle{
+      font-size:18px; font-weight:900; letter-spacing:.2px;
+    }
+    .winnerSub{
+      color: var(--muted);
+      margin-top:6px;
+      line-height:1.35;
+      font-size:13px;
+    }
+    canvas#confetti{
+      position:absolute; inset:0;
+      pointer-events:none;
+    }
+
+    @media (max-width: 980px){
+      .wrap{ grid-template-columns: 1fr; }
+      .rightGrid{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <!-- LEFT -->
+    <section class="panel" id="panelPlayers">
+      <header>
+        <div>
+          <h1>Dart 501 – Double-out (meerdere spelers)</h1>
+          <div class="sub" id="modeText">Spelers toevoegen, namen wijzigen, dan starten.</div>
+        </div>
+        <div class="row">
+          <span class="pill" id="turnPill"><strong>Setup</strong></span>
+          <button class="btn-accent" id="btnStart">Start</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <!-- SETUP -->
+        <div id="setupView">
+          <div class="row" style="justify-content:space-between; align-items:flex-end; gap:12px;">
+            <div class="small" style="flex:1">
+              Voeg spelers toe via <strong>+</strong>. Je kunt namen vóór start wijzigen.
+            </div>
+            <button id="btnAddPlayer" class="btn-accent">+ Speler</button>
+          </div>
+          <div class="sep"></div>
+          <div class="players-setup" id="playersSetup"></div>
+        </div>
+
+        <!-- GAME -->
+        <div id="gameView" style="display:none;">
+          <div class="players-game" id="playersGame"></div>
+          <div class="sep"></div>
+          <div class="row" style="justify-content:space-between; gap:10px; flex-wrap:wrap;">
+            <span class="pill"><strong>Regel:</strong> je moet met een dubbel uitgooien (Bull = dubbel 25).</span>
+            <button id="btnNewGame" class="btn-danger">Nieuw spel</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT -->
+    <section class="panel" id="panelKeypad">
+      <header>
+        <div>
+          <div style="font-weight:800;">Dartbord-toetsenbord</div>
+          <div class="sub" id="keypadSub">Start het spel om invoer te activeren.</div>
+        </div>
+        <span class="pill" id="multPill"><strong>Modus:</strong> Single</span>
+      </header>
+
+      <div class="content">
+        <div class="rightGrid">
+
+          <!-- Dartboard -->
+          <div class="boardWrap">
+            <div class="boardHead">
+              <div>
+                <div class="boardTitle">Dartbord</div>
+                <div class="boardHint">Pijlen van de huidige beurt worden gevisualiseerd.</div>
+              </div>
+              <span class="pill"><strong>3 pijlen</strong></span>
+            </div>
+            <div class="boardStage">
+              <svg id="dartboard" viewBox="-220 -220 440 440" aria-label="Dartboard">
+                <defs>
+                  <filter id="glowHit">
+                    <feGaussianBlur stdDeviation="2.6" result="b"/>
+                    <feMerge>
+                      <feMergeNode in="b"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                  <filter id="glowReco">
+                    <feGaussianBlur stdDeviation="2.8" result="b"/>
+                    <feMerge>
+                      <feMergeNode in="b"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                  <filter id="dartShadow">
+                    <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="rgba(0,0,0,.55)"/>
+                  </filter>
+                </defs>
+
+                <g id="boardSegments"></g>
+
+                <!-- Wires -->
+                <circle r="200" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="2"></circle>
+                <circle id="wireDoubleOuter" r="0" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="1.5"></circle>
+                <circle id="wireDoubleInner" r="0" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="1.5"></circle>
+                <circle id="wireTrebleOuter" r="0" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="1.5"></circle>
+                <circle id="wireTrebleInner" r="0" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="1.5"></circle>
+                <circle id="wireOuterBull" r="0" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="1.5"></circle>
+                <circle id="wireBull" r="0" fill="none" stroke="rgba(255,255,255,.10)" stroke-width="1.5"></circle>
+
+                <!-- Numbers -->
+                <g id="boardNumbers"></g>
+
+                <!-- Dart markers -->
+                <g id="dartMarkers"></g>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Keypad -->
+          <div>
+            <div class="multis">
+              <button class="multi active" data-m="S" id="mS">Single</button>
+              <button class="multi" data-m="D" id="mD">Dubbel</button>
+              <button class="multi" data-m="T" id="mT">Trippel</button>
+            </div>
+
+            <div class="keypad" id="keypadNumbers"></div>
+
+            <div class="actions">
+              <button id="btnMiss" class="btn-warn">Miss (0)</button>
+              <button id="btnOuterBull">Outer Bull (25)</button>
+              <button id="btnBull" class="btn-accent">Bull (50)</button>
+            </div>
+
+            <div class="actions">
+              <button id="btnUndo">Undo</button>
+              <button id="btnBust" class="btn-danger">Bust</button>
+              <button id="btnNext">Volgende speler</button>
+            </div>
+
+            <div class="log" id="log"></div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- WINNER POPUP -->
+  <div class="overlay" id="winnerOverlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="winnerTitle">
+      <canvas id="confetti"></canvas>
+      <header>
+        <div class="winnerTitle" id="winnerTitle">Winnaar!</div>
+        <span class="pill" id="winnerPill"><strong>Double-out</strong></span>
+      </header>
+      <div class="body">
+        <div class="winnerSub" id="winnerSub"></div>
+        <div style="height:12px"></div>
+        <div class="row" style="justify-content:flex-end; gap:10px; flex-wrap:wrap;">
+          <button class="btn-accent" id="btnModalNewGame">New game</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const START_SCORE = 501;
+
+  // -----------------------------
+  // Dart options (no miss)
+  // -----------------------------
+  function dartOptionsNoMiss(){
+    const opts = [];
+    for (let n=1; n<=20; n++){
+      opts.push({label:`${n}`, value:n, isDouble:false});
+      opts.push({label:`D${n}`, value:2*n, isDouble:true});
+      opts.push({label:`T${n}`, value:3*n, isDouble:false});
+    }
+    opts.push({label:`25`, value:25, isDouble:false});
+    opts.push({label:`Bull`, value:50, isDouble:true}); // bull counts as double
+    return opts;
+  }
+  const OPTS = dartOptionsNoMiss();
+
+  // -----------------------------
+  // Checkout (best sequence)
+  // -----------------------------
+  function generateCheckouts(score){
+    if (score < 2 || score > 170) return [];
+    const results = [];
+
+    for (const a of OPTS){
+      if (a.value === score && a.isDouble) results.push([a]);
+    }
+    for (const a of OPTS){
+      for (const b of OPTS){
+        if (a.value + b.value === score && b.isDouble) results.push([a,b]);
+      }
+    }
+    for (const a of OPTS){
+      for (const b of OPTS){
+        const rem = score - a.value - b.value;
+        if (rem <= 0) continue;
+        for (const c of OPTS){
+          if (c.value === rem && c.isDouble) results.push([a,b,c]);
+        }
+      }
+    }
+
+    const seen = new Set();
+    const uniq = [];
+    for (const seq of results){
+      const key = seq.map(x => x.label).join('-');
+      if (!seen.has(key)){ seen.add(key); uniq.push(seq); }
+    }
+    return uniq;
+  }
+
+  function preferenceScore(seq){
+    const last = seq[seq.length-1]?.label ?? '';
+    const finishRank = (() => {
+      const map = new Map([
+        ['D20', 120], ['D16', 116], ['D18', 114], ['D10', 110], ['D12', 108],
+        ['Bull', 106], ['D8', 104], ['D6', 103]
+      ]);
+      return map.get(last) ?? 90;
+    })();
+
+    const dartsPenalty = (seq.length === 1 ? 0 : (seq.length === 2 ? 28 : 60));
+    const first = seq[0];
+    const firstTrebleBonus = (seq.length === 3 && first.label.startsWith('T')) ? 14 : 0;
+    const highFirstBonus = Math.min(28, Math.floor((first.value || 0) / 2));
+    const outerBullPenalty = seq.some(x => x.label === '25') ? 6 : 0;
+
+    return (finishRank + firstTrebleBonus + highFirstBonus) - dartsPenalty - outerBullPenalty;
+  }
+
+  function bestCheckoutSeq(score){
+    const all = generateCheckouts(score);
+    if (all.length === 0) return null;
+    all.sort((a,b) => preferenceScore(b) - preferenceScore(a));
+    return all[0];
+  }
+
+  function bestCheckoutLine(score){
+    const seq = bestCheckoutSeq(score);
+    if (!seq) return null;
+    return seq.map(x => x.label).join(' • ');
+  }
+
+  // -----------------------------
+  // 9-darter possible within remaining darts up to 9
+  // -----------------------------
+  function possibleFinishWithinDarts(score, dartsLeft){
+    if (dartsLeft <= 0) return false;
+    if (score < 2) return false;
+
+    const memo = new Map();
+    const key = (s,d) => `${s}|${d}`;
+
+    function dfs(s, d){
+      const k = key(s,d);
+      if (memo.has(k)) return memo.get(k);
+
+      if (d === 1){
+        const ok = OPTS.some(o => o.isDouble && o.value === s);
+        memo.set(k, ok);
+        return ok;
+      }
+
+      for (const o of OPTS){
+        const ns = s - o.value;
+        if (ns < 0) continue;
+        if (ns === 1) continue;
+        if (ns === 0) continue; // must finish on last dart
+        if (dfs(ns, d-1)){
+          memo.set(k, true);
+          return true;
+        }
+      }
+
+      memo.set(k, false);
+      return false;
+    }
+
+    return dfs(score, dartsLeft);
+  }
+
+  function nineDarterPossible(p){
+    const thrown = p.dartsThrown ?? 0;
+    const remaining = 9 - thrown;
+    if (remaining <= 0) return false;
+    return possibleFinishWithinDarts(p.score, remaining);
+  }
+
+  // -----------------------------
+  // 3-dart average
+  // -----------------------------
+  function threeDartAverage(p){
+    if (!p || !p.dartsThrown) return 0;
+    return (p.totalScored / p.dartsThrown) * 3;
+  }
+
+  // -----------------------------
+  // State
+  // -----------------------------
+  let state = {
+    phase: 'setup',
+    players: [
+      { id: crypto.randomUUID(), name:'Speler 1', score: START_SCORE, dartsThrown: 0, totalScored: 0 }
+    ],
+    currentPlayerIndex: 0,
+    dartIndex: 0,
+    turnStartScore: START_SCORE,
+    currentTurnThrows: [null,null,null],
+    multiplier: 'S',
+    finished: false
+  };
+
+  // -----------------------------
+  // DOM
+  // -----------------------------
+  const el = (id) => document.getElementById(id);
+
+  const setupView = el('setupView');
+  const gameView = el('gameView');
+  const playersSetup = el('playersSetup');
+  const playersGame = el('playersGame');
+
+  const btnAddPlayer = el('btnAddPlayer');
+  const btnStart = el('btnStart');
+  const btnNewGame = el('btnNewGame');
+
+  const modeText = el('modeText');
+  const turnPill = el('turnPill');
+
+  const keypadSub = el('keypadSub');
+  const multPill = el('multPill');
+
+  const keypadNumbers = el('keypadNumbers');
+  const btnMiss = el('btnMiss');
+  const btnOuterBull = el('btnOuterBull');
+  const btnBull = el('btnBull');
+  const btnUndo = el('btnUndo');
+  const btnBust = el('btnBust');
+  const btnNext = el('btnNext');
+  const logEl = el('log');
+
+  const overlay = el('winnerOverlay');
+  const winnerTitle = el('winnerTitle');
+  const winnerSub = el('winnerSub');
+  const winnerPill = el('winnerPill');
+  const btnModalNewGame = el('btnModalNewGame');
+
+  const multiButtons = {
+    S: el('mS'),
+    D: el('mD'),
+    T: el('mT')
+  };
+
+  // Dartboard SVG
+  const boardSegmentsG = el('boardSegments');
+  const boardNumbersG = el('boardNumbers');
+  const dartMarkersG = el('dartMarkers');
+
+  // -----------------------------
+  // Helpers
+  // -----------------------------
+  function log(msg, type='info'){
+    const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    const line = document.createElement('div');
+    line.textContent = `[${time}] ${msg}`;
+    line.style.color = (type==='danger') ? 'var(--danger)' : (type==='warn' ? 'var(--warn)' : 'var(--muted)');
+    logEl.prepend(line);
+  }
+
+  function setMultiplier(m){
+    state.multiplier = m;
+    Object.entries(multiButtons).forEach(([key, btn]) => btn.classList.toggle('active', key === m));
+    multPill.innerHTML = `<strong>Modus:</strong> ${m==='S'?'Single':(m==='D'?'Dubbel':'Trippel')}`;
+  }
+
+  function currentPlayer(){
+    return state.players[state.currentPlayerIndex];
+  }
+
+  function throwLabel(mult, n){
+    if (mult === 'S') return `${n}`;
+    if (mult === 'D') return `D${n}`;
+    if (mult === 'T') return `T${n}`;
+    return `${n}`;
+  }
+  function throwValue(mult, n){
+    if (mult === 'S') return n;
+    if (mult === 'D') return 2*n;
+    if (mult === 'T') return 3*n;
+    return n;
+  }
+
+  function resetTurnFor(p){
+    state.turnStartScore = p.score;
+    state.dartIndex = 0;
+    state.currentTurnThrows = [null,null,null];
+    updateDartboard(getRecommendationsForCurrentState());
+  }
+
+  function isValidFinish(newScore, lastThrow){
+    return (newScore === 0 && lastThrow?.isDouble === true);
+  }
+
+  function isBust(newScore, lastThrow){
+    if (newScore < 0) return true;
+    if (newScore === 1) return true;
+    if (newScore === 0 && !lastThrow.isDouble) return true;
+    return false;
+  }
+
+  function goNextPlayer(){
+    if (state.finished) return;
+    state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
+    resetTurnFor(currentPlayer());
+    renderGame();
+  }
+
+  // -----------------------------
+  // CONFETTI (canvas)
+  // -----------------------------
+  const confettiCanvas = document.getElementById('confetti');
+  const ctx = confettiCanvas.getContext('2d');
+  let confettiRAF = null;
+  let confettiPieces = [];
+
+  function resizeConfetti(){
+    const rect = confettiCanvas.parentElement.getBoundingClientRect();
+    confettiCanvas.width = Math.floor(rect.width);
+    confettiCanvas.height = Math.floor(rect.height);
+  }
+  function rand(min, max){ return Math.random() * (max - min) + min; }
+
+  function initConfetti(){
+    resizeConfetti();
+    confettiPieces = [];
+    const count = 180;
+    for (let i=0; i<count; i++){
+      confettiPieces.push({
+        x: rand(0, confettiCanvas.width),
+        y: rand(-confettiCanvas.height, 0),
+        w: rand(6, 12),
+        h: rand(6, 14),
+        vx: rand(-1.8, 1.8),
+        vy: rand(2.2, 5.2),
+        rot: rand(0, Math.PI*2),
+        vr: rand(-0.12, 0.12),
+        alpha: rand(0.7, 1),
+        hue: Math.floor(rand(0, 360))
+      });
+    }
+  }
+
+  function drawConfetti(){
+    ctx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height);
+    for (const p of confettiPieces){
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vr;
+
+      if (p.y > confettiCanvas.height + 20){
+        p.y = rand(-60, -10);
+        p.x = rand(0, confettiCanvas.width);
+      }
+      if (p.x < -20) p.x = confettiCanvas.width + 20;
+      if (p.x > confettiCanvas.width + 20) p.x = -20;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle = `hsl(${p.hue} 90% 60%)`;
+      ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      ctx.restore();
+    }
+    confettiRAF = requestAnimationFrame(drawConfetti);
+  }
+
+  function startConfetti(){
+    initConfetti();
+    if (confettiRAF) cancelAnimationFrame(confettiRAF);
+    confettiRAF = requestAnimationFrame(drawConfetti);
+    window.addEventListener('resize', resizeConfetti);
+  }
+
+  function stopConfetti(){
+    if (confettiRAF) cancelAnimationFrame(confettiRAF);
+    confettiRAF = null;
+    ctx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height);
+    window.removeEventListener('resize', resizeConfetti);
+  }
+
+  // -----------------------------
+  // WINNER POPUP
+  // -----------------------------
+  function showWinnerModal(winner, lastThrow){
+    const avg3 = threeDartAverage(winner);
+    const nine = (winner.dartsThrown <= 9) ? ' (9-darter!)' : '';
+
+    winnerTitle.textContent = `Winnaar!`;
+    winnerPill.innerHTML = `<strong>${winner.name}</strong>`;
+    winnerSub.textContent = `Finish: ${lastThrow.label}. Darts: ${winner.dartsThrown}. Gemiddelde (3 pijlen): ${avg3.toFixed(1)}.${nine}`;
+
+    overlay.classList.add('show');
+    overlay.setAttribute('aria-hidden', 'false');
+    startConfetti();
+  }
+
+  function hideWinnerModal(){
+    overlay.classList.remove('show');
+    overlay.setAttribute('aria-hidden', 'true');
+    stopConfetti();
+  }
+
+  function finishGame(winner, lastThrow){
+    state.finished = true;
+    log(`${winner.name} heeft uitgegooid met ${lastThrow.label}.`, 'info');
+    renderGame();
+    showWinnerModal(winner, lastThrow);
+  }
+
+  // -----------------------------
+  // Dartboard geometry (SVG radius = 200)
+  // -----------------------------
+  const BOARD_R = 200;
+  const SCALE = BOARD_R / 225.5;
+  const MM = (mm) => mm * SCALE;
+
+  const R_BULL = MM(12.7 / 2);
+  const R_OUTER_BULL = MM(31.8 / 2);
+
+  const TREBLE_OUTER = MM(107.0);
+  const TREBLE_INNER = TREBLE_OUTER - MM(8.0);
+
+  const DOUBLE_OUTER = MM(170.0);
+  const DOUBLE_INNER = DOUBLE_OUTER - MM(8.0);
+
+  const INNER_SINGLE_OUTER = TREBLE_INNER;
+  const INNER_SINGLE_INNER = R_OUTER_BULL;
+
+  const OUTER_SINGLE_OUTER = DOUBLE_INNER;
+  const OUTER_SINGLE_INNER = TREBLE_OUTER;
+
+  // Clockwise from top
+  const SEG_ORDER = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+
+  function polar(r, angRad){
+    return { x: r * Math.cos(angRad), y: r * Math.sin(angRad) };
+  }
+
+  function sectorPath(rInner, rOuter, a0, a1){
+    const p0 = polar(rOuter, a0);
+    const p1 = polar(rOuter, a1);
+    const p2 = polar(rInner, a1);
+    const p3 = polar(rInner, a0);
+    const largeArc = (Math.abs(a1 - a0) > Math.PI) ? 1 : 0;
+    return [
+      `M ${p0.x} ${p0.y}`,
+      `A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${p1.x} ${p1.y}`,
+      `L ${p2.x} ${p2.y}`,
+      `A ${rInner} ${rInner} 0 ${largeArc} 0 ${p3.x} ${p3.y}`,
+      `Z`
+    ].join(' ');
+  }
+
+  function cssVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function isWhiteIndex(i){
+    // alternating; 20 (i=0) treated as black base on most boards
+    return (i % 2) === 1;
+  }
+
+  function buildDartboardSVG(){
+    boardSegmentsG.innerHTML = '';
+    boardNumbersG.innerHTML = '';
+
+    el('wireDoubleOuter').setAttribute('r', DOUBLE_OUTER.toFixed(2));
+    el('wireDoubleInner').setAttribute('r', DOUBLE_INNER.toFixed(2));
+    el('wireTrebleOuter').setAttribute('r', TREBLE_OUTER.toFixed(2));
+    el('wireTrebleInner').setAttribute('r', TREBLE_INNER.toFixed(2));
+    el('wireOuterBull').setAttribute('r', R_OUTER_BULL.toFixed(2));
+    el('wireBull').setAttribute('r', R_BULL.toFixed(2));
+
+    const disc = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    disc.setAttribute('r', BOARD_R);
+    disc.setAttribute('fill', 'rgba(0,0,0,.25)');
+    disc.setAttribute('stroke', 'rgba(255,255,255,.08)');
+    disc.setAttribute('stroke-width', '2');
+    boardSegmentsG.appendChild(disc);
+
+    const red = cssVar('--db-red');
+    const green = cssVar('--db-green');
+    const black = cssVar('--db-black');
+    const white = cssVar('--db-white');
+
+    const segAngle = (Math.PI * 2) / 20;
+    const startAt = -Math.PI / 2; // top
+
+    for (let i=0; i<20; i++){
+      const num = SEG_ORDER[i];
+      const mid = startAt + i*segAngle;
+      const a0 = mid - segAngle/2;
+      const a1 = mid + segAngle/2;
+
+      const whiteSeg = isWhiteIndex(i);
+      const singleFill = whiteSeg ? white : black;
+
+      // standard alternation: black single => red double/treble; white single => green double/treble
+      const rg = whiteSeg ? green : red;
+
+      addSeg(`S${num}-outer`, num, 'S', OUTER_SINGLE_INNER, OUTER_SINGLE_OUTER, a0, a1, singleFill);
+      addSeg(`D${num}`, num, 'D', DOUBLE_INNER, DOUBLE_OUTER, a0, a1, rg);
+      addSeg(`S${num}-inner`, num, 'S', INNER_SINGLE_INNER, INNER_SINGLE_OUTER, a0, a1, singleFill);
+      addSeg(`T${num}`, num, 'T', TREBLE_INNER, TREBLE_OUTER, a0, a1, rg);
+
+      // Numbers around board (upright)
+      const rNum = BOARD_R + 16;
+      const pt = polar(rNum, mid);
+      const tx = document.createElementNS('http://www.w3.org/2000/svg','text');
+      tx.setAttribute('x', pt.x.toFixed(2));
+      tx.setAttribute('y', pt.y.toFixed(2));
+      tx.setAttribute('class', 'dbNum');
+      tx.textContent = String(num);
+      boardNumbersG.appendChild(tx);
+    }
+
+    const outerBull = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    outerBull.setAttribute('r', R_OUTER_BULL.toFixed(2));
+    outerBull.setAttribute('fill', green);
+    outerBull.setAttribute('class','seg');
+    outerBull.setAttribute('id','seg-25');
+    boardSegmentsG.appendChild(outerBull);
+
+    const innerBull = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    innerBull.setAttribute('r', R_BULL.toFixed(2));
+    innerBull.setAttribute('fill', red);
+    innerBull.setAttribute('class','seg');
+    innerBull.setAttribute('id','seg-Bull');
+    boardSegmentsG.appendChild(innerBull);
+
+    function addSeg(id, num, ring, rIn, rOut, a0, a1, fill){
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d', sectorPath(rIn, rOut, a0, a1));
+      path.setAttribute('fill', fill);
+      path.setAttribute('class', 'seg');
+      path.setAttribute('id', `seg-${ring}${num}`);
+      path.dataset.ring = ring;
+      path.dataset.num = String(num);
+      boardSegmentsG.appendChild(path);
+    }
+  }
+
+  function targetPoint(label){
+    if (!label) return null;
+    if (label === '0') return null;
+    if (label === 'Bull') return { x: 0, y: 0 };
+    if (label === '25'){
+      const r = (R_OUTER_BULL + R_BULL) / 2;
+      const ang = -Math.PI/2;
+      return polar(r, ang);
+    }
+
+    let ring = 'S';
+    let numStr = label;
+
+    if (label.startsWith('T')) { ring = 'T'; numStr = label.slice(1); }
+    else if (label.startsWith('D')) { ring = 'D'; numStr = label.slice(1); }
+    else { ring = 'S'; numStr = label; }
+
+    const num = parseInt(numStr, 10);
+    if (!Number.isFinite(num)) return null;
+
+    const idx = SEG_ORDER.indexOf(num);
+    if (idx < 0) return null;
+
+    const segAngle = (Math.PI * 2) / 20;
+    const startAt = -Math.PI / 2;
+    const mid = startAt + idx * segAngle;
+
+    let r = 0;
+    if (ring === 'D') r = (DOUBLE_INNER + DOUBLE_OUTER) / 2;
+    else if (ring === 'T') r = (TREBLE_INNER + TREBLE_OUTER) / 2;
+    else r = (INNER_SINGLE_INNER + INNER_SINGLE_OUTER) / 2;
+
+    return polar(r, mid);
+  }
+
+  function clearBoardHighlights(){
+    const all = boardSegmentsG.querySelectorAll('.seg');
+    all.forEach(e => e.classList.remove('hit','reco'));
+  }
+
+  function highlightTarget(label, cls){
+    if (!label || label === '0') return;
+    let id = '';
+    if (label === 'Bull') id = 'seg-Bull';
+    else if (label === '25') id = 'seg-25';
+    else if (label.startsWith('T') || label.startsWith('D')) id = `seg-${label}`;
+    else id = `seg-S${label}`;
+
+    const seg = document.getElementById(id);
+    if (seg) seg.classList.add(cls);
+  }
+
+  function renderDartMarkers(){
+    dartMarkersG.innerHTML = '';
+    state.currentTurnThrows.forEach((t) => {
+      if (!t) return;
+      const pt = targetPoint(t.label);
+      if (!pt) return;
+
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      g.setAttribute('class', 'dartMarker');
+
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx', pt.x.toFixed(2));
+      c.setAttribute('cy', pt.y.toFixed(2));
+      c.setAttribute('r', '5.2');
+      c.setAttribute('fill', 'rgba(255,255,255,.95)');
+      c.setAttribute('stroke', 'rgba(0,0,0,.55)');
+      c.setAttribute('stroke-width','1');
+      g.appendChild(c);
+
+      const l = document.createElementNS('http://www.w3.org/2000/svg','line');
+      const tail = polar(14, Math.atan2(pt.y, pt.x));
+      l.setAttribute('x1', pt.x.toFixed(2));
+      l.setAttribute('y1', pt.y.toFixed(2));
+      l.setAttribute('x2', (pt.x + tail.x).toFixed(2));
+      l.setAttribute('y2', (pt.y + tail.y).toFixed(2));
+      l.setAttribute('stroke', 'rgba(255,255,255,.85)');
+      l.setAttribute('stroke-width','2.2');
+      l.setAttribute('stroke-linecap','round');
+      g.appendChild(l);
+
+      dartMarkersG.appendChild(g);
+    });
+  }
+
+  function updateDartboard(recoLabels){
+    clearBoardHighlights();
+
+    // highlight hits
+    state.currentTurnThrows.forEach(t => {
+      if (!t) return;
+      highlightTarget(t.label, 'hit');
+    });
+
+    // highlight recommendations
+    if (Array.isArray(recoLabels)){
+      recoLabels.forEach(lbl => highlightTarget(lbl, 'reco'));
+    }
+
+    renderDartMarkers();
+  }
+
+  // -----------------------------
+  // Recommendations: FIXED (works for 1/2/3 darts)
+  // - maps sequence onto remaining boxes starting at current dartIndex
+  // -----------------------------
+  function getRecommendationsForCurrentState(){
+    if (state.phase !== 'game' || state.finished) return { seq:null, recoLabels:[], recoMap:new Map() };
+
+    const p = currentPlayer();
+    const seq = bestCheckoutSeq(p.score);
+    if (!seq) return { seq:null, recoLabels:[], recoMap:new Map() };
+
+    const recoMap = new Map(); // boxIndex -> label
+    const recoLabels = [];
+
+    for (let k=0; k<seq.length; k++){
+      const boxIndex = state.dartIndex + k;
+      if (boxIndex > 2) break;
+
+      // only recommend if not already filled (should be true for boxIndex>=dartIndex)
+      if (!state.currentTurnThrows[boxIndex]){
+        const lbl = seq[k].label;
+        recoMap.set(boxIndex, lbl);
+        recoLabels.push(lbl);
+      }
+    }
+
+    return { seq, recoLabels, recoMap };
+  }
+
+  // -----------------------------
+  // Rendering
+  // -----------------------------
+  function renderSetup(){
+    playersSetup.innerHTML = '';
+    state.players.forEach((p, idx) => {
+      const line = document.createElement('div');
+      line.className = 'player-line';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = p.name;
+      input.placeholder = `Speler ${idx+1}`;
+      input.addEventListener('input', (e) => {
+        p.name = e.target.value.trim() || `Speler ${idx+1}`;
+      });
+
+      const remove = document.createElement('button');
+      remove.className = 'btn-danger';
+      remove.textContent = 'Verwijder';
+      remove.disabled = state.players.length <= 1;
+      remove.addEventListener('click', () => {
+        state.players = state.players.filter(x => x.id !== p.id);
+        render();
+      });
+
+      line.appendChild(input);
+      line.appendChild(remove);
+      playersSetup.appendChild(line);
+    });
+
+    btnStart.disabled = state.players.length < 1;
+  }
+
+  function renderGame(){
+    playersGame.innerHTML = '';
+
+    const rec = getRecommendationsForCurrentState();
+    updateDartboard(rec.recoLabels);
+
+    state.players.forEach((p, idx) => {
+      const card = document.createElement('div');
+      card.className = 'player-card' + (idx === state.currentPlayerIndex ? ' active' : '');
+
+      const top = document.createElement('div');
+      top.className = 'player-top';
+
+      const left = document.createElement('div');
+      const nameRow = document.createElement('div');
+      nameRow.className = 'name';
+      nameRow.textContent = p.name;
+
+      if (!state.finished && nineDarterPossible(p)){
+        const nine = document.createElement('span');
+        nine.className = 'pill purple';
+        nine.innerHTML = `<strong>9</strong>`;
+        nameRow.appendChild(nine);
+      }
+
+      const avg3 = threeDartAverage(p);
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.innerHTML = `Darts: <strong>${p.dartsThrown}</strong> • Gemiddelde (3 pijlen): <strong>${avg3.toFixed(1)}</strong>`;
+
+      left.appendChild(nameRow);
+      left.appendChild(meta);
+
+      const right = document.createElement('div');
+      right.className = 'score';
+      right.textContent = p.score;
+
+      top.appendChild(left);
+      top.appendChild(right);
+
+      const throws = document.createElement('div');
+      throws.className = 'throws';
+
+      for (let i=0; i<3; i++){
+        const box = document.createElement('div');
+        box.className = 'throw-box';
+
+        const t = (idx === state.currentPlayerIndex) ? state.currentTurnThrows[i] : null;
+        box.textContent = t ? t.label : '—';
+
+        if (idx === state.currentPlayerIndex && !state.finished){
+          box.classList.toggle('selected', i === state.dartIndex);
+
+          // FIX: highlight last 1/2/3 recommended throws correctly
+          if (rec.recoMap.has(i) && !t){
+            box.classList.add('reco');
+          }
+        } else {
+          box.classList.add('locked');
+        }
+
+        throws.appendChild(box);
+      }
+
+      const advice = document.createElement('div');
+      advice.className = 'advice';
+      const bestLine = (!state.finished) ? bestCheckoutLine(p.score) : null;
+
+      if (!state.finished && bestLine){
+        advice.innerHTML = `<strong>Ideale uitgooi-lijn:</strong><br>`;
+        const one = document.createElement('span');
+        one.className = 'one';
+        one.textContent = bestLine;
+        advice.appendChild(one);
+      } else {
+        advice.textContent = (!state.finished ? 'Geen uitgooi mogelijk binnen 3 pijlen (double-out).' : '—');
+      }
+
+      card.appendChild(top);
+      card.appendChild(throws);
+      card.appendChild(advice);
+      playersGame.appendChild(card);
+    });
+
+    if (!state.finished){
+      const p = currentPlayer();
+      keypadSub.textContent = `Invoer voor: ${p.name} (score ${p.score})`;
+      turnPill.innerHTML = `<strong>Beurt:</strong> ${p.name}`;
+    } else {
+      keypadSub.textContent = `Spel klaar. Start een nieuw spel.`;
+      turnPill.innerHTML = `<strong>Klaar</strong>`;
+    }
+
+    const enable = (state.phase === 'game' && !state.finished);
+    [...document.querySelectorAll('#panelKeypad button')].forEach(b => b.disabled = !enable);
+    btnNewGame.disabled = false;
+  }
+
+  function render(){
+    if (state.phase === 'setup'){
+      setupView.style.display = '';
+      gameView.style.display = 'none';
+      modeText.textContent = 'Spelers toevoegen, namen wijzigen, dan starten.';
+      turnPill.innerHTML = `<strong>Setup</strong>`;
+      keypadSub.textContent = 'Start het spel om invoer te activeren.';
+      [...document.querySelectorAll('#panelKeypad button')].forEach(b => b.disabled = true);
+      btnNewGame.disabled = true;
+      hideWinnerModal();
+      renderSetup();
+      updateDartboard([]);
+    } else {
+      setupView.style.display = 'none';
+      gameView.style.display = '';
+      modeText.textContent = 'Klik cijfers (1–20) + optioneel Dubbel/Trippel. App gaat automatisch naar het volgende vakje en wisselt speler na 3 pijlen of bust.';
+      renderGame();
+    }
+  }
+
+  // -----------------------------
+  // Keypad build
+  // -----------------------------
+  function buildKeypad(){
+    keypadNumbers.innerHTML = '';
+    for (let n=1; n<=20; n++){
+      const b = document.createElement('button');
+      b.textContent = n;
+      b.addEventListener('click', () => enterNumber(n));
+      keypadNumbers.appendChild(b);
+    }
+  }
+
+  // -----------------------------
+  // Input handling (FIX: 3rd dart visible + then next)
+  // -----------------------------
+  function enterThrow(t){
+    if (state.phase !== 'game' || state.finished) return;
+    const p = currentPlayer();
+
+    state.currentTurnThrows[state.dartIndex] = t;
+
+    p.dartsThrown += 1;
+    p.totalScored += t.value;
+
+    const newScore = p.score - t.value;
+
+    if (isBust(newScore, t)){
+      // show bust on current UI first
+      renderGame();
+      p.score = state.turnStartScore;
+      log(`${p.name}: ${t.label} → BUST. Score terug naar ${p.score}.`, 'danger');
+
+      // small delay so user sees the 3rd/2nd dart entry before switch
+      setTimeout(() => goNextPlayer(), 220);
+      return;
+    }
+
+    p.score = newScore;
+    log(`${p.name}: ${t.label} → score ${p.score}`, 'info');
+
+    if (isValidFinish(p.score, t)){
+      finishGame(p, t);
+      return;
+    }
+
+    if (state.dartIndex < 2){
+      state.dartIndex += 1;
+      renderGame();
+    } else {
+      // FIX: ensure the 3rd dart is shown before switching players
+      renderGame();
+      setTimeout(() => goNextPlayer(), 220);
+    }
+  }
+
+  function enterNumber(n){
+    const mult = state.multiplier;
+    const t = { label: throwLabel(mult, n), value: throwValue(mult, n), isDouble: (mult === 'D') };
+    setMultiplier('S');
+    enterThrow(t);
+  }
+
+  function enterMiss(){ setMultiplier('S'); enterThrow({label:'0', value:0, isDouble:false}); }
+  function enterOuterBull(){ setMultiplier('S'); enterThrow({label:'25', value:25, isDouble:false}); }
+  function enterBull(){ setMultiplier('S'); enterThrow({label:'Bull', value:50, isDouble:true}); }
+
+  function undo(){
+    if (state.phase !== 'game' || state.finished) return;
+    const p = currentPlayer();
+
+    let idx = state.dartIndex;
+    if (!state.currentTurnThrows[idx]) idx -= 1;
+    if (idx < 0) return;
+
+    const t = state.currentTurnThrows[idx];
+    if (!t) return;
+
+    p.score += t.value;
+    p.dartsThrown = Math.max(0, p.dartsThrown - 1);
+    p.totalScored = Math.max(0, p.totalScored - t.value);
+
+    state.currentTurnThrows[idx] = null;
+    state.dartIndex = idx;
+
+    log(`${p.name}: Undo ${t.label} → score ${p.score}`, 'warn');
+    renderGame();
+  }
+
+  // -----------------------------
+  // New game reset
+  // -----------------------------
+  function backToSetupNewGame(){
+    state.phase = 'setup';
+    state.finished = false;
+    state.currentPlayerIndex = 0;
+    state.dartIndex = 0;
+    state.turnStartScore = START_SCORE;
+    state.currentTurnThrows = [null,null,null];
+    state.players = state.players.map((p, idx) => ({
+      ...p,
+      name: (p.name && p.name.trim()) ? p.name.trim() : `Speler ${idx+1}`,
+      score: START_SCORE,
+      dartsThrown: 0,
+      totalScored: 0
+    }));
+    logEl.innerHTML = '';
+    setMultiplier('S');
+    render();
+  }
+
+  // -----------------------------
+  // Events
+  // -----------------------------
+  btnAddPlayer.addEventListener('click', () => {
+    const n = state.players.length + 1;
+    state.players.push({ id: crypto.randomUUID(), name:`Speler ${n}`, score: START_SCORE, dartsThrown: 0, totalScored: 0 });
+    renderSetup();
+  });
+
+  btnStart.addEventListener('click', () => {
+    state.players = state.players.map((p, idx) => ({
+      ...p,
+      name: (p.name && p.name.trim()) ? p.name.trim() : `Speler ${idx+1}`,
+      score: START_SCORE,
+      dartsThrown: 0,
+      totalScored: 0
+    }));
+    state.phase = 'game';
+    state.currentPlayerIndex = 0;
+    state.finished = false;
+    setMultiplier('S');
+    resetTurnFor(currentPlayer());
+    logEl.innerHTML = '';
+    log('Spel gestart (501, double-out).', 'info');
+    render();
+  });
+
+  btnNewGame.addEventListener('click', backToSetupNewGame);
+  btnModalNewGame.addEventListener('click', () => {
+    hideWinnerModal();
+    backToSetupNewGame();
+  });
+
+  Object.values(multiButtons).forEach(btn => {
+    btn.addEventListener('click', () => setMultiplier(btn.dataset.m));
+  });
+
+  btnMiss.addEventListener('click', enterMiss);
+  btnOuterBull.addEventListener('click', enterOuterBull);
+  btnBull.addEventListener('click', enterBull);
+  btnUndo.addEventListener('click', undo);
+
+  btnBust.addEventListener('click', () => {
+    if (state.phase !== 'game' || state.finished) return;
+    const p = currentPlayer();
+    p.score = state.turnStartScore;
+    log(`${p.name}: Handmatige BUST. Score terug naar ${p.score}.`, 'danger');
+    setTimeout(() => goNextPlayer(), 220);
+  });
+
+  btnNext.addEventListener('click', () => {
+    if (state.phase !== 'game' || state.finished) return;
+    const p = currentPlayer();
+    log(`${p.name}: beurt beëindigd (volgende speler).`, 'warn');
+    goNextPlayer();
+  });
+
+  // -----------------------------
+  // Dartboard rendering
+  // -----------------------------
+  function renderDartMarkers(){
+    dartMarkersG.innerHTML = '';
+    state.currentTurnThrows.forEach((t) => {
+      if (!t) return;
+      const pt = targetPoint(t.label);
+      if (!pt) return;
+
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      g.setAttribute('class', 'dartMarker');
+
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx', pt.x.toFixed(2));
+      c.setAttribute('cy', pt.y.toFixed(2));
+      c.setAttribute('r', '5.2');
+      c.setAttribute('fill', 'rgba(255,255,255,.95)');
+      c.setAttribute('stroke', 'rgba(0,0,0,.55)');
+      c.setAttribute('stroke-width','1');
+      g.appendChild(c);
+
+      const l = document.createElementNS('http://www.w3.org/2000/svg','line');
+      const tail = polar(14, Math.atan2(pt.y, pt.x));
+      l.setAttribute('x1', pt.x.toFixed(2));
+      l.setAttribute('y1', pt.y.toFixed(2));
+      l.setAttribute('x2', (pt.x + tail.x).toFixed(2));
+      l.setAttribute('y2', (pt.y + tail.y).toFixed(2));
+      l.setAttribute('stroke', 'rgba(255,255,255,.85)');
+      l.setAttribute('stroke-width','2.2');
+      l.setAttribute('stroke-linecap','round');
+      g.appendChild(l);
+
+      dartMarkersG.appendChild(g);
+    });
+  }
+
+  function clearBoardHighlights(){
+    const all = boardSegmentsG.querySelectorAll('.seg');
+    all.forEach(e => e.classList.remove('hit','reco'));
+  }
+
+  function highlightTarget(label, cls){
+    if (!label || label === '0') return;
+    let id = '';
+    if (label === 'Bull') id = 'seg-Bull';
+    else if (label === '25') id = 'seg-25';
+    else if (label.startsWith('T') || label.startsWith('D')) id = `seg-${label}`;
+    else id = `seg-S${label}`;
+
+    const seg = document.getElementById(id);
+    if (seg) seg.classList.add(cls);
+  }
+
+  function updateDartboard(recoLabels){
+    clearBoardHighlights();
+
+    state.currentTurnThrows.forEach(t => {
+      if (!t) return;
+      highlightTarget(t.label, 'hit');
+    });
+
+    if (Array.isArray(recoLabels)){
+      recoLabels.forEach(lbl => highlightTarget(lbl, 'reco'));
+    }
+
+    renderDartMarkers();
+  }
+
+  // -----------------------------
+  // Init
+  // -----------------------------
+  buildDartboardSVG();
+  buildKeypad();
+  setMultiplier('S');
+  render();
+})();
+</script>
+</body>
+</html>
